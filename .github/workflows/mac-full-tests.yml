@@ -1,0 +1,76 @@
+name: Mac full regression
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: macos-15-intel
+            rid: osx-x64
+          - runner: macos-26
+            rid: osx-arm64
+          - runner: macos-26-intel
+            rid: osx-x64
+    runs-on: ${{ matrix.runner }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RID: ${{ matrix.rid }}
+      TMPDIR: /private/tmp
+      AVALONIA_TELEMETRY_OPTOUT: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - name: Get published application and private test kit
+        run: |
+          gh release download mac-validation-kit --pattern "mac-validation-$RID.zip"
+          gh release download mac-v0.3.0-beta --pattern "OmniZip-0.3.0-$RID-beta.zip" --pattern "OmniZip-0.3.0-$RID-beta.zip.sha256"
+          shasum -a 256 -c "OmniZip-0.3.0-$RID-beta.zip.sha256"
+          ditto -x -k "mac-validation-$RID.zip" kit
+          ditto -x -k "OmniZip-0.3.0-$RID-beta.zip" app
+          mkdir -p results kit/portable/engine kit/desktop/engine
+          cp app/OmniZip.app/Contents/MacOS/engine/7zz kit/portable/engine/7zz
+          cp app/OmniZip.app/Contents/MacOS/engine/7zz kit/desktop/engine/7zz
+          # Exercise the exact application assembly shipped to users with the UI harness.
+          cp app/OmniZip.app/Contents/MacOS/OmniZip.dll kit/desktop/OmniZip.dll
+          chmod +x kit/portable/NativeTests kit/desktop/UiTests kit/portable/engine/7zz kit/desktop/engine/7zz
+          codesign --force --sign - kit/portable/NativeTests
+          codesign --force --sign - kit/desktop/UiTests
+      - name: Published package smoke check
+        run: |
+          set -o pipefail
+          sw_vers | tee results/environment.txt
+          uname -m | tee -a results/environment.txt
+          codesign --verify --deep --strict app/OmniZip.app
+          app/OmniZip.app/Contents/MacOS/OmniZip --self-test 2>&1 | tee results/published-app.txt
+      - name: Full archive engine regression
+        run: |
+          set -o pipefail
+          kit/portable/NativeTests 2>&1 | tee results/engine-tests.txt
+      - name: Application control and layout regression (headless)
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          kit/desktop/UiTests "$PWD/results" 2>&1 | tee results/ui-tests.txt
+      - name: Native window startup
+        if: ${{ !cancelled() }}
+        run: |
+          app/OmniZip.app/Contents/MacOS/OmniZip > results/native-window.txt 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          sleep 10
+          kill -0 "$app_pid"
+          screencapture -x results/native-window.png
+          echo 'PASS native window startup' >> results/native-window.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-regression-${{ matrix.runner }}
+          path: results/
+          retention-days: 14
