@@ -39,7 +39,7 @@ jobs:
         run: |
           app="$PWD/unpack/OmniZip.app"
           while IFS= read -r -d '' binary; do
-            if file -b "$binary" | grep -q 'Mach-O'; then codesign --force --sign - "$binary"; fi
+            if file -b "$binary" | grep -q 'Mach-O' || [[ "$binary" == *.dll ]]; then codesign --force --sign - "$binary"; fi
           done < <(find "$app/Contents/MacOS" -type f -print0)
           codesign --force --sign - "$app"
           codesign --verify --deep --strict "$app"
