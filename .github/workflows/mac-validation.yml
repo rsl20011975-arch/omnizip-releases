@@ -61,4 +61,5 @@ jobs:
         run: |
           ditto -c -k --keepParent unpack/OmniZip.app "OmniZip-0.3.0-$RID-beta.zip"
           shasum -a 256 "OmniZip-0.3.0-$RID-beta.zip" > "OmniZip-0.3.0-$RID-beta.zip.sha256"
+          echo 'Native GUI startup log captured.' >> "gui-$RID.txt"
           gh release upload mac-v0.3.0-beta "OmniZip-0.3.0-$RID-beta.zip" "OmniZip-0.3.0-$RID-beta.zip.sha256" "validation-$RID.txt" "gui-$RID.txt" "gui-$RID.png" --clobber
