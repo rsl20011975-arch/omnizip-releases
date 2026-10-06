@@ -68,6 +68,12 @@ jobs:
           kill -0 "$app_pid"
           screencapture -x results/native-window.png
           echo 'PASS native window startup' >> results/native-window.txt
+      - name: Native platform control regression
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          mkdir -p results/native-controls
+          kit/desktop/UiTests "$PWD/results/native-controls" --native 2>&1 | tee results/native-controls/tests.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
