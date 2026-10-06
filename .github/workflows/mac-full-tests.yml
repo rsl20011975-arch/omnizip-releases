@@ -2,7 +2,7 @@ name: Mac full regression
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   regression:
     timeout-minutes: 20
@@ -28,6 +28,7 @@ jobs:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - name: Get published application and private test kit
+        id: setup
         run: |
           gh release download mac-validation-kit --pattern "mac-validation-$RID.zip"
           gh release download mac-v0.3.0-beta --pattern "OmniZip-0.3.0-$RID-beta.zip" --pattern "OmniZip-0.3.0-$RID-beta.zip.sha256"
@@ -54,12 +55,12 @@ jobs:
           set -o pipefail
           kit/portable/NativeTests 2>&1 | tee results/engine-tests.txt
       - name: Application control and layout regression (headless)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
           set -o pipefail
           kit/desktop/UiTests "$PWD/results" 2>&1 | tee results/ui-tests.txt
       - name: Native window startup
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
           app/OmniZip.app/Contents/MacOS/OmniZip > results/native-window.txt 2>&1 &
           app_pid=$!
@@ -69,7 +70,7 @@ jobs:
           screencapture -x results/native-window.png
           echo 'PASS native window startup' >> results/native-window.txt
       - name: Native platform control regression
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
           set -o pipefail
           mkdir -p results/native-controls
