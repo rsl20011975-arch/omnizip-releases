@@ -1,0 +1,64 @@
+name: Validate Mac beta
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            rid: osx-arm64
+            file: OmniZip-0.3.0-osx-arm64-development-20261006T075400.zip
+            sha: 5fad306b0919dfb4416ce2f77ad427c5d03644f4254625acdf6b564067cde18a
+          - runner: macos-15-intel
+            rid: osx-x64
+            file: OmniZip-0.3.0-osx-x64-development-20261006T075400.zip
+            sha: 8a35412e6a87f6a983208577e6838818f1d8fd840aabb026eed8a06e4ee55758
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      FILE: ${{ matrix.file }}
+      EXPECTED: ${{ matrix.sha }}
+      RID: ${{ matrix.rid }}
+    steps:
+      - name: Download and verify candidate
+        run: |
+          gh release download mac-v0.3.0-beta --pattern "$FILE"
+          echo "$EXPECTED  $FILE" | shasum -a 256 -c -
+          mkdir unpack
+          ditto -x -k "$FILE" unpack
+          test -x unpack/OmniZip.app/Contents/MacOS/OmniZip
+          test -x unpack/OmniZip.app/Contents/MacOS/engine/7zz
+          plutil -lint unpack/OmniZip.app/Contents/Info.plist
+      - name: Apply local ad hoc signature (not Developer ID)
+        run: |
+          app="$PWD/unpack/OmniZip.app"
+          while IFS= read -r -d '' binary; do
+            if file -b "$binary" | grep -q 'Mach-O'; then codesign --force --sign - "$binary"; fi
+          done < <(find "$app/Contents/MacOS" -type f -print0)
+          codesign --force --sign - "$app"
+          codesign --verify --deep --strict "$app"
+      - name: Run bundled engine and native window
+        run: |
+          set -o pipefail
+          app="$PWD/unpack/OmniZip.app"
+          sw_vers | tee "validation-$RID.txt"
+          uname -m | tee -a "validation-$RID.txt"
+          "$app/Contents/MacOS/OmniZip" --self-test 2>&1 | tee -a "validation-$RID.txt"
+          "$app/Contents/MacOS/OmniZip" > "gui-$RID.txt" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          sleep 10
+          kill -0 "$app_pid"
+          screencapture -x "gui-$RID.png"
+          echo 'PASS native GUI process stayed running for 10 seconds; screenshot captured' | tee -a "validation-$RID.txt"
+      - name: Package validated beta
+        run: |
+          ditto -c -k --keepParent unpack/OmniZip.app "OmniZip-0.3.0-$RID-beta.zip"
+          shasum -a 256 "OmniZip-0.3.0-$RID-beta.zip" > "OmniZip-0.3.0-$RID-beta.zip.sha256"
+          gh release upload mac-v0.3.0-beta "OmniZip-0.3.0-$RID-beta.zip" "OmniZip-0.3.0-$RID-beta.zip.sha256" "validation-$RID.txt" "gui-$RID.txt" "gui-$RID.png" --clobber
