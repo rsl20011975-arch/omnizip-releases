@@ -2,7 +2,7 @@ name: Mac full regression
 on:
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   regression:
     timeout-minutes: 20
