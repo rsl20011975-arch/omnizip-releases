@@ -2,7 +2,7 @@ name: Mac full regression
 on:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   regression:
     timeout-minutes: 20
@@ -30,11 +30,11 @@ jobs:
       - name: Get published application and private test kit
         id: setup
         run: |
-          gh release download mac-validation-kit --pattern "mac-validation-$RID.zip"
-          gh release download mac-v0.3.0-beta --pattern "OmniZip-0.3.0-$RID-beta.zip" --pattern "OmniZip-0.3.0-$RID-beta.zip.sha256"
-          shasum -a 256 -c "OmniZip-0.3.0-$RID-beta.zip.sha256"
-          ditto -x -k "mac-validation-$RID.zip" kit
-          ditto -x -k "OmniZip-0.3.0-$RID-beta.zip" app
+          gh release download mac-validation-kit --pattern "mac-validation-0.3.1-$RID.zip"
+          gh release download mac-v0.3.1-beta --pattern "OmniZip-0.3.1-$RID-beta.zip" --pattern "OmniZip-0.3.1-$RID-beta.zip.sha256"
+          shasum -a 256 -c "OmniZip-0.3.1-$RID-beta.zip.sha256"
+          ditto -x -k "mac-validation-0.3.1-$RID.zip" kit
+          ditto -x -k "OmniZip-0.3.1-$RID-beta.zip" app
           mkdir -p results kit/portable/engine kit/desktop/engine
           cp app/OmniZip.app/Contents/MacOS/engine/7zz kit/portable/engine/7zz
           cp app/OmniZip.app/Contents/MacOS/engine/7zz kit/desktop/engine/7zz

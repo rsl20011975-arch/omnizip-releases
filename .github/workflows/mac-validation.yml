@@ -11,12 +11,12 @@ jobs:
         include:
           - runner: macos-15
             rid: osx-arm64
-            file: OmniZip-0.3.0-osx-arm64-development-20261006T075400.zip
-            sha: 5fad306b0919dfb4416ce2f77ad427c5d03644f4254625acdf6b564067cde18a
+            file: OmniZip-0.3.1-osx-arm64-development-20261007T094142.zip
+            sha: 718c6da0d27c17c4ab9c513ca16f5824a2438f67361678d2e755a6afd490e459
           - runner: macos-15-intel
             rid: osx-x64
-            file: OmniZip-0.3.0-osx-x64-development-20261006T075400.zip
-            sha: 8a35412e6a87f6a983208577e6838818f1d8fd840aabb026eed8a06e4ee55758
+            file: OmniZip-0.3.1-osx-x64-development-20261007T094142.zip
+            sha: 659d5ad76a990e9aa0ebf2832d326d2fab315294bed8a75361239f358f9c2c1e
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     env:
@@ -28,19 +28,24 @@ jobs:
     steps:
       - name: Download and verify candidate
         run: |
-          test "$(gh release view mac-v0.3.0-beta --json isDraft --jq .isDraft)" = true
-          gh release download mac-v0.3.0-beta --pattern "$FILE"
+          test "$(gh release view mac-v0.3.1-beta --json isDraft --jq .isDraft)" = true
+          gh release download mac-v0.3.1-beta --pattern "$FILE"
           echo "$EXPECTED  $FILE" | shasum -a 256 -c -
           mkdir unpack
           ditto -x -k "$FILE" unpack
           test -x unpack/OmniZip.app/Contents/MacOS/OmniZip
           test -x unpack/OmniZip.app/Contents/MacOS/engine/7zz
           plutil -lint unpack/OmniZip.app/Contents/Info.plist
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' unpack/OmniZip.app/Contents/Info.plist)" = '0.3.1'
+          for extension in zip 7z rar 001; do
+            plutil -convert xml1 -o - unpack/OmniZip.app/Contents/Info.plist | grep -q "<string>$extension</string>"
+          done
           cat > unpack/OmniZip.app/Contents/Resources/READ-ME.md <<'DOC'
-          # OmniZip 0.3.0 Mac beta
+          # OmniZip 0.3.1 Mac beta
           개인·업무용 무료 압축 앱입니다. 광고나 부가 프로그램 설치 기능이 없습니다.
           ZIP을 풀고 OmniZip.app을 응용 프로그램 폴더로 옮긴 뒤 실행하세요.
           Apple Silicon은 arm64, Intel Mac은 x64 파일을 사용하세요. macOS 14 이상 대상입니다.
+          Finder의 '다음으로 열기' 후보에 ZIP, 7Z, RAR, 001 형식으로 등록됩니다. 기존 기본 앱은 바꾸지 않습니다.
           macOS 15의 두 아키텍처에서 한글 파일, 암호 ZIP/7Z 생성·검사·해제·되돌리기 및 앱 시작을 자동 검증합니다.
           모든 운영체제 및 GUI 작업에 대한 보증은 아닙니다.
           Apple Developer ID 인증·공증은 적용하지 않았습니다. 출처를 신뢰할 때만 Apple의 앱별 실행 허용 안내를 따르세요.
@@ -48,7 +53,7 @@ jobs:
           시스템 전체 보안 설정을 끄지 마세요.
           되돌리기 기록은 현재 세션에만 유지되며, 원본 백업은 .omnizip-undo 폴더에 남습니다.
           이용 조건 및 문의: https://omniark.co/tools/omnizip/terms
-          검증 로그·다운로드: https://github.com/rsl20011975-arch/omnizip-releases/releases/tag/mac-v0.3.0-beta
+          검증 로그·다운로드: https://github.com/rsl20011975-arch/omnizip-releases/releases/tag/mac-v0.3.1-beta
           제3자 라이선스와 7-Zip 소스는 Contents/Resources/licenses에 포함됩니다.
           DOC
       - name: Apply local ad hoc signature (not Developer ID)
@@ -75,7 +80,7 @@ jobs:
           echo 'PASS native GUI process stayed running for 10 seconds; screenshot captured' | tee -a "validation-$RID.txt"
       - name: Package validated beta
         run: |
-          ditto -c -k --keepParent unpack/OmniZip.app "OmniZip-0.3.0-$RID-beta.zip"
-          shasum -a 256 "OmniZip-0.3.0-$RID-beta.zip" > "OmniZip-0.3.0-$RID-beta.zip.sha256"
+          ditto -c -k --keepParent unpack/OmniZip.app "OmniZip-0.3.1-$RID-beta.zip"
+          shasum -a 256 "OmniZip-0.3.1-$RID-beta.zip" > "OmniZip-0.3.1-$RID-beta.zip.sha256"
           echo 'Native GUI startup log captured.' >> "gui-$RID.txt"
-          gh release upload mac-v0.3.0-beta "OmniZip-0.3.0-$RID-beta.zip" "OmniZip-0.3.0-$RID-beta.zip.sha256" "validation-$RID.txt" "gui-$RID.txt" "gui-$RID.png" --clobber
+          gh release upload mac-v0.3.1-beta "OmniZip-0.3.1-$RID-beta.zip" "OmniZip-0.3.1-$RID-beta.zip.sha256" "validation-$RID.txt" "gui-$RID.txt" "gui-$RID.png" --clobber
